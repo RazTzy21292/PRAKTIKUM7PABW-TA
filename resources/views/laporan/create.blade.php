@@ -23,16 +23,21 @@
         {{ $flash['message'] }}
     </div>
 @endif
+@if ($errors->any())
+    <div class="alert alert-error" role="alert">
+        <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+    </div>
+@endif
 
 <div class="form-card">
-    <form action="{{ url('/laporan/store') }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ route('laporan.store') }}" method="POST" enctype="multipart/form-data">
 @csrf
         <div class="form-group">
             <label for="tong_id">Lokasi Tong Sampah</label>
             <select id="tong_id" name="tong_id" class="form-control" required>
                 <option value="">Pilih lokasi tong</option>
                 @foreach ($daftarTong as $tong)
-                    <option value="{!! $tong['id'] !!}">{{ $tong['nama_tong'] }} — {{ $tong['lokasi'] }}</option>
+                    <option value="{!! $tong['id'] !!}" @selected(old('tong_id') == $tong['id'])>{{ $tong['nama_tong'] }} — {{ $tong['lokasi'] }}</option>
                 @endforeach
             </select>
         </div>
@@ -41,20 +46,21 @@
             <label for="status">Status Kondisi</label>
             <select id="status" name="status" class="form-control" required>
                 <option value="">Pilih status</option>
-                <option value="kosong">Kosong</option>
-                <option value="sedang">Sedang (terisi sebagian)</option>
-                <option value="penuh">Penuh</option>
+                <option value="kosong" @selected(old('status') === 'kosong')>Kosong</option>
+                <option value="sedang" @selected(old('status') === 'sedang')>Sedang (terisi sebagian)</option>
+                <option value="penuh" @selected(old('status') === 'penuh')>Penuh</option>
             </select>
         </div>
 
         <div class="form-group">
             <label for="keterangan">Keterangan (opsional)</label>
-            <textarea id="keterangan" name="keterangan" class="form-control" placeholder="Contoh: Tong sudah penuh sejak pagi, perlu segera dikosongkan"></textarea>
+            <textarea id="keterangan" name="keterangan" class="form-control" placeholder="Contoh: Tong sudah penuh sejak pagi, perlu segera dikosongkan">{{ old('keterangan') }}</textarea>
         </div>
 
         <div class="form-group">
             <label for="foto">Foto Tong Sampah (opsional, +5 poin bonus)</label>
             <input type="file" id="foto" name="foto" class="form-control" accept="image/jpeg,image/png,image/webp">
+            <small>JPG, PNG, atau WEBP; maksimal 2 MB.</small>
         </div>
 
         <div class="form-actions">

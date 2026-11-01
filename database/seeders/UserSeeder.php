@@ -10,7 +10,6 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Akun demo tetap (password: password123)
         $demo = [
             ['Andi Saputra', 'andi.saputra@smacan.sch.id', '2024001234', '11 IPA 2', 1250],
             ['Budi Rahayu', 'budi.rahayu@smacan.sch.id', '2024001235', '11 IPA 1', 2100],
@@ -18,9 +17,8 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($demo as [$nama, $email, $nis, $kelas, $poin]) {
-            User::create([
+            User::updateOrCreate(['email' => $email], [
                 'nama' => $nama,
-                'email' => $email,
                 'password' => 'password123',
                 'nis' => $nis,
                 'kelas' => $kelas,
@@ -29,16 +27,14 @@ class UserSeeder extends Seeder
             ]);
         }
 
-        // Data dummy otomatis dengan Faker (locale Indonesia)
         $faker = Faker::create('id_ID');
         $daftarKelas = ['X IPA 1', 'X IPA 2', 'X IPS 1', 'XI IPA 1', 'XI IPA 2', 'XI IPS 1', 'XII IPA 1', 'XII IPS 1'];
 
-        for ($i = 0; $i < 12; $i++) {
-            User::create([
+        for ($i = 1; $i <= 10; $i++) {
+            User::updateOrCreate(['email' => sprintf('dummy.%02d@smacan.sch.id', $i)], [
                 'nama' => $faker->name(),
-                'email' => $faker->unique()->numerify('siswa####') . '@smacan.sch.id',
                 'password' => 'password123',
-                'nis' => $faker->unique()->numerify('2024######'),
+                'nis' => '2024'.str_pad((string) $i, 6, '0', STR_PAD_LEFT),
                 'kelas' => $faker->randomElement($daftarKelas),
                 'role' => 'siswa',
                 'total_poin' => $faker->numberBetween(0, 2500),

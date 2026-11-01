@@ -9,40 +9,44 @@ use App\Http\Controllers\LokasiController;
 use App\Http\Controllers\PointController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
-// ===== AUTH (publik) =====
+
 Route::get('/', [AuthController::class, 'landing']);
 Route::get('/landing', [AuthController::class, 'landing'])->name('landing');
-Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
-Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-Route::post('/register', [AuthController::class, 'register']);
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
+    Route::post('/register', [AuthController::class, 'register']);
+});
 
-// ===== HALAMAN SETELAH LOGIN =====
+
 Route::middleware('auth')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index']);
     Route::get('/lokasi', [LokasiController::class, 'index']);
     Route::get('/point', [PointController::class, 'index']);
 
-    // Edukasi
+
     Route::get('/edukasi', [EdukasiController::class, 'index']);
     Route::post('/edukasi/klaim/{id}', [EdukasiController::class, 'klaim']);
 
-    // Profil
+
     Route::get('/profile', [ProfileController::class, 'index']);
     Route::post('/profile/update', [ProfileController::class, 'update']);
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
 
-    // CRUD Laporan Sampah
-    Route::get('/laporan', [LaporanController::class, 'index']);
-    Route::get('/laporan/create', [LaporanController::class, 'create']);
-    Route::post('/laporan/store', [LaporanController::class, 'store']);
-    Route::get('/laporan/edit/{id}', [LaporanController::class, 'edit']);
-    Route::post('/laporan/update/{id}', [LaporanController::class, 'update']);
-    Route::post('/laporan/delete/{id}', [LaporanController::class, 'delete']);
 
-    // REST API internal (AJAX)
+    Route::get('/foto/{path}', function (string $path) {
+        abort_unless(Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->response($path);
+    })->where('path', 'laporan/[A-Za-z0-9._-]+')->name('foto.laporan');
+
+    Route::resource('laporan', LaporanController::class)->except(['show']);
+
+
     Route::prefix('api')->group(function () {
         Route::get('/stats', [ApiController::class, 'stats']);
         Route::get('/tong', [ApiController::class, 'tong']);

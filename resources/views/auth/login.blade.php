@@ -22,12 +22,17 @@
                 {{ $flash['message'] }}
             </div>
         @endif
+        @if ($errors->any())
+            <div class="alert alert-error" role="alert">
+                <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+        @endif
 
         <form action="{{ url('/login') }}" method="POST">
 @csrf
             <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email" class="form-control" placeholder="nama@@smacan.sch.id" required autofocus>
+                <input type="email" id="email" name="email" class="form-control" placeholder="nama@smacan.sch.id" value="{{ old('email') }}" required autofocus>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>

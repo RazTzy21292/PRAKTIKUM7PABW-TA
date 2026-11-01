@@ -10,7 +10,11 @@ class LaporanSampah extends Model
 {
     protected $table = 'laporan_sampah';
 
-    protected $fillable = ['user_id', 'tong_id', 'status', 'keterangan', 'foto', 'poin_didapat'];
+    protected $fillable = ['user_id', 'tong_id', 'status', 'keterangan', 'foto', 'poin_didapat', 'edited_at'];
+
+    protected $casts = [
+        'edited_at' => 'datetime',
+    ];
 
     public function user(): BelongsTo
     {

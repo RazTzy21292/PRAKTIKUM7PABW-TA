@@ -23,24 +23,30 @@
         {{ $flash['message'] }}
     </div>
 @endif
+@if ($errors->any())
+    <div class="alert alert-error" role="alert">
+        <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+    </div>
+@endif
 
 <div class="form-card">
     @if (!empty($laporan['foto']))
         <div class="form-group">
             <label>Foto Saat Ini</label>
             <div class="laporan-thumb" style="width:100px;height:100px">
-                <img src="{{ asset('uploads/laporan/' . $laporan['foto']) }}" alt="Foto laporan">
+                <img src="{{ str_contains($laporan['foto'], '/') ? url('foto/' . $laporan['foto']) : asset('uploads/laporan/' . $laporan['foto']) }}" alt="Foto laporan">
             </div>
         </div>
     @endif
 
-    <form action="{{ url('/laporan/update/' . $laporan['id']) }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ route('laporan.update', $laporan['id']) }}" method="POST" enctype="multipart/form-data">
 @csrf
+@method('PUT')
         <div class="form-group">
             <label for="tong_id">Lokasi Tong Sampah</label>
             <select id="tong_id" name="tong_id" class="form-control" required>
                 @foreach ($daftarTong as $tong)
-                    <option value="{!! $tong['id'] !!}" {!! (int) $tong['id'] === (int) $laporan['tong_id'] ? 'selected' : '' !!}>
+                    <option value="{!! $tong['id'] !!}" {!! (int) $tong['id'] === (int) old('tong_id', $laporan['tong_id']) ? 'selected' : '' !!}>
                         {{ $tong['nama_tong'] }} — {{ $tong['lokasi'] }}
                     </option>
                 @endforeach
@@ -50,20 +56,21 @@
         <div class="form-group">
             <label for="status">Status Kondisi</label>
             <select id="status" name="status" class="form-control" required>
-                <option value="kosong" {!! $laporan['status'] === 'kosong' ? 'selected' : '' !!}>Kosong</option>
-                <option value="sedang" {!! $laporan['status'] === 'sedang' ? 'selected' : '' !!}>Sedang (terisi sebagian)</option>
-                <option value="penuh" {!! $laporan['status'] === 'penuh' ? 'selected' : '' !!}>Penuh</option>
+                <option value="kosong" {!! old('status', $laporan['status']) === 'kosong' ? 'selected' : '' !!}>Kosong</option>
+                <option value="sedang" {!! old('status', $laporan['status']) === 'sedang' ? 'selected' : '' !!}>Sedang (terisi sebagian)</option>
+                <option value="penuh" {!! old('status', $laporan['status']) === 'penuh' ? 'selected' : '' !!}>Penuh</option>
             </select>
         </div>
 
         <div class="form-group">
             <label for="keterangan">Keterangan (opsional)</label>
-            <textarea id="keterangan" name="keterangan" class="form-control">{{ $laporan['keterangan'] ?? '' }}</textarea>
+            <textarea id="keterangan" name="keterangan" class="form-control">{{ old('keterangan', $laporan['keterangan'] ?? '') }}</textarea>
         </div>
 
         <div class="form-group">
             <label for="foto">Ganti Foto (opsional)</label>
             <input type="file" id="foto" name="foto" class="form-control" accept="image/jpeg,image/png,image/webp">
+            <small>JPG, PNG, atau WEBP; maksimal 2 MB.</small>
         </div>
 
         <div class="form-actions">

@@ -2,19 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Concerns\HandlesUploads;
 use App\Models\LaporanSampah;
 use App\Models\TongSampah;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class LaporanController extends Controller
 {
-    use HandlesUploads;
-
-    private const STATUS = ['kosong', 'sedang', 'penuh'];
-
-    /** READ - daftar laporan milik user yang login */
     public function index()
     {
         $user = Auth::user();
@@ -26,7 +21,6 @@ class LaporanController extends Controller
         ]);
     }
 
-    /** CREATE - form */
     public function create()
     {
         return view('laporan.create', [
@@ -36,52 +30,34 @@ class LaporanController extends Controller
         ]);
     }
 
-    /** CREATE - simpan ke database */
     public function store(Request $request)
     {
         $user = Auth::user();
-        $tongId = $request->input('tong_id');
-        $status = $request->input('status');
-
-        if (empty($tongId) || empty($status)) {
-            return $this->kembali('/laporan/create', 'error', 'Lokasi tong dan status wajib dipilih.');
-        }
-        if (! in_array($status, self::STATUS, true) || ! TongSampah::whereKey($tongId)->exists()) {
-            return $this->kembali('/laporan/create', 'error', 'Status tidak valid.');
-        }
-
-        $foto = null;
-        if ($request->hasFile('foto')) {
-            $foto = $this->simpanGambar($request->file('foto'), 'laporan', 'laporan_');
-            if ($foto === false) {
-                return $this->kembali('/laporan/create', 'error', 'Foto harus berformat JPG/PNG/WEBP dan maksimal 2MB.');
-            }
-        }
-
+        $data = $request->validate($this->aturanValidasi(), $this->pesanValidasi());
+        $foto = $request->file('foto')?->store('laporan', 'public');
         $poin = $foto ? 10 : 5;
 
-        LaporanSampah::create([
+        $user->laporan()->create([
             'user_id' => $user->id,
-            'tong_id' => $tongId,
-            'status' => $status,
-            'keterangan' => trim((string) $request->input('keterangan', '')) ?: null,
+            'tong_id' => $data['tong_id'],
+            'status' => $data['status'],
+            'keterangan' => $data['keterangan'] ?? null,
             'foto' => $foto,
             'poin_didapat' => $poin,
         ]);
 
-        TongSampah::whereKey($tongId)->update(['status' => $status]);
+        TongSampah::whereKey($data['tong_id'])->update(['status' => $data['status']]);
         $user->increment('total_poin', $poin);
 
-        return $this->kembali('/laporan', 'success', 'Laporan berhasil dikirim! +' . $poin . ' poin didapat.');
+        return redirect()->route('laporan.index')->with('flash', [
+            'type' => 'success',
+            'message' => 'Laporan berhasil dikirim! +'.$poin.' poin didapat.',
+        ]);
     }
 
-    /** UPDATE - form edit (hanya milik sendiri) */
-    public function edit($id)
+    public function edit(int $id)
     {
         $laporan = $this->milikSendiri($id);
-        if (! $laporan) {
-            return $this->kembali('/laporan', 'error', 'Laporan tidak ditemukan atau bukan milikmu.');
-        }
 
         return view('laporan.edit', [
             'user' => Auth::user(),
@@ -91,63 +67,87 @@ class LaporanController extends Controller
         ]);
     }
 
-    /** UPDATE - simpan perubahan */
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id)
     {
         $laporan = $this->milikSendiri($id);
-        if (! $laporan) {
-            return $this->kembali('/laporan', 'error', 'Laporan tidak ditemukan atau bukan milikmu.');
-        }
-
-        $tongId = $request->input('tong_id');
-        $status = $request->input('status');
-
-        if (empty($tongId) || ! in_array($status, self::STATUS, true) || ! TongSampah::whereKey($tongId)->exists()) {
-            return $this->kembali('/laporan/edit/' . $id, 'error', 'Data tidak valid.');
-        }
-
-        $data = [
-            'tong_id' => $tongId,
-            'status' => $status,
-            'keterangan' => trim((string) $request->input('keterangan', '')) ?: null,
-        ];
-
-        if ($request->hasFile('foto')) {
-            $fotoBaru = $this->simpanGambar($request->file('foto'), 'laporan', 'laporan_');
-            if ($fotoBaru === false) {
-                return $this->kembali('/laporan/edit/' . $id, 'error', 'Foto harus berformat JPG/PNG/WEBP dan maksimal 2MB.');
-            }
-            $this->hapusGambar($laporan->foto, 'laporan');
+        $data = $request->validate($this->aturanValidasi(), $this->pesanValidasi());
+        unset($data['foto']);
+        $data['edited_at'] = now();
+        $fotoLama = $laporan->foto;
+        $fotoBaru = $request->file('foto')?->store('laporan', 'public');
+        if ($fotoBaru) {
             $data['foto'] = $fotoBaru;
         }
-
         $laporan->update($data);
-        TongSampah::whereKey($tongId)->update(['status' => $status]);
+        TongSampah::whereKey($data['tong_id'])->update(['status' => $data['status']]);
 
-        return $this->kembali('/laporan', 'success', 'Laporan berhasil diperbarui.');
-    }
-
-    /** DELETE - hapus laporan milik sendiri */
-    public function delete($id)
-    {
-        $laporan = $this->milikSendiri($id);
-        if (! $laporan) {
-            return $this->kembali('/laporan', 'error', 'Laporan tidak ditemukan atau bukan milikmu.');
+        if ($fotoBaru) {
+            $this->hapusFoto($fotoLama);
         }
 
-        $this->hapusGambar($laporan->foto, 'laporan');
+        return redirect()->route('laporan.index')->with('flash', [
+            'type' => 'success',
+            'message' => 'Laporan berhasil diperbarui.',
+        ]);
+    }
+
+    public function destroy(int $id)
+    {
+        $laporan = $this->milikSendiri($id);
+        $foto = $laporan->foto;
         $laporan->delete();
+        $this->hapusFoto($foto);
 
-        return $this->kembali('/laporan', 'success', 'Laporan berhasil dihapus.');
+        return redirect()->route('laporan.index')->with('flash', [
+            'type' => 'success',
+            'message' => 'Laporan berhasil dihapus.',
+        ]);
     }
 
-    private function milikSendiri($id): ?LaporanSampah
+    private function milikSendiri(int $id): LaporanSampah
     {
-        return LaporanSampah::where('id', $id)->where('user_id', Auth::id())->first();
+        return LaporanSampah::where('user_id', Auth::id())->findOrFail($id);
     }
 
-    private function kembali(string $url, string $type, string $message)
+    private function aturanValidasi(): array
     {
-        return redirect($url)->with('flash', ['type' => $type, 'message' => $message]);
+        return [
+            'tong_id' => ['required', 'exists:tong_sampah,id'],
+            'status' => ['required', 'in:kosong,sedang,penuh'],
+            'keterangan' => ['nullable', 'string', 'max:2000'],
+            'foto' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ];
+    }
+
+    private function pesanValidasi(): array
+    {
+        return [
+            'tong_id.required' => 'Lokasi tong wajib dipilih.',
+            'tong_id.exists' => 'Lokasi tong yang dipilih tidak tersedia.',
+            'status.required' => 'Status kondisi wajib dipilih.',
+            'status.in' => 'Pilih status kosong, sedang, atau penuh.',
+            'foto.image' => 'File yang diunggah harus berupa gambar.',
+            'foto.mimes' => 'Foto harus berformat JPG, PNG, atau WEBP.',
+            'foto.max' => 'Ukuran foto maksimal 2 MB.',
+        ];
+    }
+
+    private function hapusFoto(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        if (str_contains($path, '/')) {
+            Storage::disk('public')->delete($path);
+
+            return;
+        }
+
+        Storage::disk('public')->delete('laporan/'.$path);
+        $legacyPath = public_path('uploads/laporan/'.basename($path));
+        if (is_file($legacyPath)) {
+            unlink($legacyPath);
+        }
     }
 }

@@ -22,6 +22,11 @@
                 {{ $flash['message'] }}
             </div>
         @endif
+        @if ($errors->any())
+            <div class="alert alert-error" role="alert">
+                <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+            </div>
+        @endif
 
         <form action="{{ url('/register') }}" method="POST">
 @csrf
@@ -32,7 +37,7 @@
             </div>
             <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email" class="form-control" placeholder="nama@@smacan.sch.id" required
+                <input type="email" id="email" name="email" class="form-control" placeholder="nama@smacan.sch.id" required
                        value="{{ old('email') }}">
             </div>
             <div class="form-group">
@@ -47,7 +52,7 @@
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" class="form-control" placeholder="Minimal 6 karakter" required>
+                <input type="password" id="password" name="password" class="form-control" placeholder="Minimal 8 karakter" required>
             </div>
             <div class="form-group">
                 <label for="password_confirm">Konfirmasi Password</label>

@@ -47,9 +47,12 @@ $user = $user ?? null;
         </a>
 
         <div class="nav-bottom">
-            <a class="nav-item logout" href="{{ url('/logout') }}">
-                <i class="ti ti-logout" aria-hidden="true"></i> Keluar
-            </a>
+            <form action="{{ route('logout') }}" method="POST">
+                @csrf
+                <button class="nav-item logout" type="submit" style="width:100%;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer">
+                    <i class="ti ti-logout" aria-hidden="true"></i> Keluar
+                </button>
+            </form>
         </div>
     </nav>
 

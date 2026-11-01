@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
@@ -37,15 +38,17 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $email = trim((string) $request->input('email', ''));
-        $password = (string) $request->input('password', '');
+        $credentials = $request->validate([
+            'email' => ['required', 'email', 'max:100'],
+            'password' => ['required', 'string'],
+        ], [
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Masukkan alamat email yang valid.',
+            'password.required' => 'Password wajib diisi.',
+        ]);
 
-        if ($email === '' || $password === '') {
-            return $this->gagal($request, 'Email dan password wajib diisi.', 'login');
-        }
-
-        if (! Auth::attempt(['email' => $email, 'password' => $password])) {
-            return $this->gagal($request, 'Email atau password salah.', 'login');
+        if (! Auth::attempt($credentials)) {
+            return back()->withErrors(['email' => 'Email atau password salah.'])->onlyInput('email');
         }
 
         $request->session()->regenerate();
@@ -55,41 +58,29 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        $nama = trim((string) $request->input('nama', ''));
-        $email = trim((string) $request->input('email', ''));
-        $nis = trim((string) $request->input('nis', ''));
-        $kelas = trim((string) $request->input('kelas', ''));
-        $password = (string) $request->input('password', '');
-
-        // Menerima beberapa kemungkinan nama kolom konfirmasi password
-        $konfirmasi = (string) ($request->input('password_confirm')
-            ?? $request->input('password_confirmation')
-            ?? $request->input('konfirmasi_password')
-            ?? $request->input('konfirmasi')
-            ?? '');
-
-        if ($nama === '' || $email === '' || $password === '') {
-            return $this->gagal($request, 'Nama, email, dan password wajib diisi.', 'register');
-        }
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return $this->gagal($request, 'Format email tidak valid.', 'register');
-        }
-        if (strlen($password) < 6) {
-            return $this->gagal($request, 'Password minimal 6 karakter.', 'register');
-        }
-        if ($password !== $konfirmasi) {
-            return $this->gagal($request, 'Konfirmasi password tidak cocok.', 'register');
-        }
-        if (User::where('email', $email)->exists()) {
-            return $this->gagal($request, 'Email sudah terdaftar, silakan login.', 'register');
-        }
+        $data = $request->validate([
+            'nama' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:100', 'unique:users,email'],
+            'nis' => ['nullable', 'string', 'max:30'],
+            'kelas' => ['nullable', 'string', 'max:50'],
+            'password' => ['required', 'string', Password::min(8)],
+            'password_confirm' => ['required', 'string', 'same:password'],
+        ], [
+            'nama.required' => 'Nama lengkap wajib diisi.',
+            'email.required' => 'Email wajib diisi.',
+            'email.email' => 'Masukkan alamat email yang valid.',
+            'email.unique' => 'Email sudah terdaftar, silakan login.',
+            'password.min' => 'Password minimal 8 karakter.',
+            'password_confirm.required' => 'Konfirmasi password wajib diisi.',
+            'password_confirm.same' => 'Konfirmasi password tidak cocok.',
+        ]);
 
         $user = User::create([
-            'nama' => $nama,
-            'email' => $email,
-            'password' => $password, // di-hash otomatis oleh cast 'hashed' pada model
-            'nis' => $nis ?: null,
-            'kelas' => $kelas ?: null,
+            'nama' => $data['nama'],
+            'email' => strtolower($data['email']),
+            'password' => $data['password'],
+            'nis' => $data['nis'] ?? null,
+            'kelas' => $data['kelas'] ?? null,
             'role' => 'siswa',
             'total_poin' => 0,
         ]);
@@ -109,31 +100,9 @@ class AuthController extends Controller
         return redirect('/landing');
     }
 
-    private function adaJson(Request $request): bool
-    {
-        return $request->ajax() || $request->wantsJson();
-    }
-
-    private function gagal(Request $request, string $pesan, string $halaman)
-    {
-        if ($this->adaJson($request)) {
-            return response()->json(['success' => false, 'message' => $pesan]);
-        }
-
-        return redirect('/' . $halaman)
-            ->withInput($request->except(
-                'password',
-                'password_confirm',
-                'password_confirmation',
-                'konfirmasi_password',
-                'konfirmasi'
-            ))
-            ->with('flash', ['type' => 'error', 'message' => $pesan]);
-    }
-
     private function berhasil(Request $request, string $pesan)
     {
-        if ($this->adaJson($request)) {
+        if ($request->ajax() || $request->wantsJson()) {
             return response()->json(['success' => true, 'message' => $pesan, 'redirect' => url('/dashboard')]);
         }
 
